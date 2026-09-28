@@ -42,6 +42,8 @@ Item {
   // (a resume that kept the same outputs) resumes instead of freezing.
   property var monitorDpms: ({})
   property bool monitorDpmsKnown: false
+  // A wake that arrived mid-blank. Not displaysBlank: a screen change clears that too.
+  property bool wakeHeld: false
   readonly property bool videoBackground: Util.isVideoPath(backgroundPath)
   property bool strandedLock: false
   property bool strandedLockResolved: false
@@ -195,13 +197,15 @@ Item {
     // skips its DPMS enable, and is then taken down by the very blank it meant
     // to undo: dark panel, blanked flag false, monitor disarmed. Let the blank
     // land and undo it on the way out instead.
-    if (!blankProcess.running && !wakeProcess.running) wakeProcess.running = true
+    if (blankProcess.running) root.wakeHeld = true
+    else if (!wakeProcess.running) wakeProcess.running = true
     if (lockRequested) armBlankTimer()
   }
 
   function runBlank() {
     root.displaysBlank = true
     root.monitorDpmsKnown = false
+    root.wakeHeld = false
     if (!blankProcess.running) blankProcess.running = true
   }
 
@@ -538,7 +542,10 @@ Item {
     command: ["bash", "-c", "omarchy-brightness-keyboard off; omarchy-brightness-display off"]
     // Any wake that arrived mid-blank was held back above, so run it here,
     // where the DPMS off it has to undo has actually landed.
-    onExited: if (!root.displaysBlank && !wakeProcess.running) wakeProcess.running = true
+    onExited: {
+      if (root.wakeHeld && !root.displaysBlank && !wakeProcess.running) wakeProcess.running = true
+      root.wakeHeld = false
+    }
   }
 
   // Quickshell exposes no DPMS signal, so the panel state is polled while a

@@ -14,13 +14,20 @@ const lockViewQml = fs.readFileSync(path.join(root, 'shell/plugins/lock/LockView
 // blank then takes the panel down behind it, with the blanked flag already
 // false and the keyboard monitor disarmed.
 assert(
-  /if \(!blankProcess\.running && !wakeProcess\.running\) wakeProcess\.running = true/.test(serviceQml),
+  /if \(blankProcess\.running\) root\.wakeHeld = true\s*else if \(!wakeProcess\.running\) wakeProcess\.running = true/.test(serviceQml),
   'a wake waits for an in-flight blank instead of racing its DPMS off'
 )
 
+// A screen change mid-blank clears displaysBlank without anyone asking for a
+// wake, so the flag alone would light a lock nobody touched.
 assert(
-  /id: blankProcess[\s\S]*?onExited: if \(!root\.displaysBlank && !wakeProcess\.running\) wakeProcess\.running = true/.test(serviceQml),
-  'the blank runs the wake it held back once its own DPMS off has landed'
+  /id: blankProcess[\s\S]*?onExited: \{\s*if \(root\.wakeHeld && !root\.displaysBlank && !wakeProcess\.running\) wakeProcess\.running = true\s*root\.wakeHeld = false/.test(serviceQml),
+  'the blank runs only a wake it actually held back, once its own DPMS off has landed'
+)
+
+assert(
+  /function runBlank\(\) \{[^}]*root\.wakeHeld = false/.test(serviceQml),
+  'a later blank supersedes a wake held back by an earlier one'
 )
 
 // Armed at blank time the idle notification never primes under someone typing
