@@ -7,6 +7,7 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 run_node_test <<'JS'
 const fs = require('fs')
 const serviceQml = fs.readFileSync(path.join(root, 'shell/plugins/lock/Service.qml'), 'utf8')
+const lockViewQml = fs.readFileSync(path.join(root, 'shell/plugins/lock/LockView.qml'), 'utf8')
 
 // `omarchy-brightness-display on` skips its dispatch when the display still
 // looks lit, so a wake that overtakes an in-flight blank does nothing and the
@@ -34,5 +35,12 @@ assert(
 assert(
   /if \(root\.lockRequested && !blankWakeMonitor\.isIdle\) \{\s*root\.armBlankTimer\(\)\s*return\s*\}/.test(serviceQml),
   'the blank waits while the compositor still sees input'
+)
+
+// The blanked flag clears when the wake is dispatched, not when the compositor
+// has handed the surface its keyboard focus back, so one call can land early.
+assert(
+  /running: root\.inputEnabled && !root\.authenticatingPassword && !root\.displaysBlank && !passwordInput\.activeFocus\s*\n\s*onTriggered: root\.forcePasswordFocus\(\)/.test(lockViewQml),
+  'the refocus retries until the field holds focus, and idles while blanked'
 )
 JS
