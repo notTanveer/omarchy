@@ -436,6 +436,24 @@ Item {
     }
   }
 
+  // Hyprland drops the lock surface's keyboard focus when the display goes
+  // DPMS-off, which severs the only route a keystroke has to runWake(): the
+  // password field's Keys handler. That leaves the blanked lock screen wakeable
+  // by pointer alone — the field cannot hear the key that would light the panel
+  // it needs to be lit to hear. The compositor still reports input as activity no
+  // matter who holds focus, so watch that instead and let any key wake the screen.
+  // Armed for the whole lock rather than only while blanked: the notification
+  // starts active and reports idle a second later, and typing restarts that
+  // second, so one armed at blank time never primes under a user who wakes the
+  // screen by typing their password straight in.
+  IdleMonitor {
+    id: blankWakeMonitor
+    enabled: root.lockRequested
+    timeout: 1
+    respectInhibitors: false
+    onIsIdleChanged: if (!isIdle && root.displaysBlank) root.runWake()
+  }
+
   Timer {
     id: fingerprintRetryTimer
     interval: 250
@@ -551,6 +569,13 @@ Item {
       // blank the freshly woken unlock screen under the user. Wall-clock time
       // exposes the gap: take a fresh run-up instead of blanking.
       if (Date.now() - armedAt > interval + 2000) {
+        root.armBlankTimer()
+        return
+      }
+      // Input the field never heard (keys while it has no focus, a scroll) is
+      // still someone at the screen. Blanking under them leaves the monitor
+      // with no idle-to-active edge to wake on until they pause.
+      if (root.lockRequested && !blankWakeMonitor.isIdle) {
         root.armBlankTimer()
         return
       }

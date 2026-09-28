@@ -71,6 +71,12 @@ Item {
   onInputEnabledChanged: {
     if (inputEnabled) Qt.callLater(forcePasswordFocus)
   }
+  // DPMS takes this surface's keyboard focus with it, and lighting the panel
+  // back up does not hand it back. Re-take it as the display returns, or the
+  // field stays deaf to everything but the click that focused it.
+  onDisplaysBlankChanged: {
+    if (!displaysBlank && inputEnabled) Qt.callLater(forcePasswordFocus)
+  }
   Component.onCompleted: {
     syncPasswordText()
     if (inputEnabled) Qt.callLater(forcePasswordFocus)
